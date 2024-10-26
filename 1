@@ -1,0 +1,71 @@
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TextChatService = game:GetService("TextChatService")
+local button1, button2 = script.Parent.Parent.AutoFarmLvL2, script.Parent.Parent.Parent.ScrollingFrame.AutoFarmLvL1
+local parent, isEnabled = script.Parent, false
+
+local codeSystem = require(ReplicatedStorage.InformationModules.CodeSystem)
+local claimedCodes, state1, state2, lastMessage, lastTime, cooldown = {}, {false, true}, {false, true}, nil, 0, 2
+
+local function convertValue(value)
+	local words = {"zéro", "un", "deux", "trois", "quatre", "cinq", "six", "sept", "huit", "neuf"}
+	local result = ""
+	for digit in tostring(value):gmatch(".") do result = result .. digit .. words[tonumber(digit) + 1] .. " " end
+	return result
+end
+
+local function clickButton(button)
+	if button and button.MouseButton1Click then firesignal(button.MouseButton1Click) end
+end
+
+local function sendCodes(player)
+	if claimedCodes[player.UserId] then return end
+	claimedCodes[player.UserId] = true
+	for code in pairs(codeSystem.Codes or {}) do TextChatService.TextChannels.RBXGeneral:SendAsync(code) end
+end
+
+local function handleMessage(msg)
+	if not isEnabled then return end
+	local player = Players:GetPlayerByUserId(msg.TextSource.UserId)
+
+	if msg.Text:lower() == "appear" and not state1[1] then
+		state1[1], state1[2] = true, false
+		clickButton(button1)
+	elseif msg.Text:lower() == "disappear" and state1[1] then
+		state1[1], state1[2] = false, true
+		clickButton(button1)
+	elseif msg.Text:lower() == "raimbow" and not state2[1] then
+		state2[1], state2[2] = true, false
+		clickButton(button2)
+	elseif msg.Text:lower() == "unraimbow" and state2[1] then
+		state2[1], state2[2] = false, true
+		clickButton(button2)
+	elseif msg.Text:lower() == "code" and player and player ~= Players.LocalPlayer then
+		sendCodes(player)
+	end
+
+	local args = msg.Text:lower():split(" ")
+	if args[1] == "how" and args[2] == "many" then
+		local target = Players:FindFirstChild(args[4])
+		if target and tick() - lastTime > cooldown and msg.Text ~= lastMessage then
+			local stat = target:FindFirstChild(args[3]:gsub("^%l", string.upper))
+			if stat then
+				TextChatService.TextChannels.RBXGeneral:SendAsync(args[3]:gsub("^%l", string.upper) .. ": " .. convertValue(stat.Value))
+				lastMessage, lastTime = msg.Text, tick()
+			end
+		end
+	end
+end
+
+local function updateTextColor()
+	parent.TextColor3 = isEnabled and Color3.new(0.2, 0.454902, 0.694118) or Color3.new(0.333333, 0.666667, 1)
+end
+
+parent.MouseButton1Click:Connect(function()
+	isEnabled = not isEnabled
+	updateTextColor()
+end)
+
+TextChatService.OnIncomingMessage = function(msg)
+	if isEnabled then handleMessage(msg) end
+end
